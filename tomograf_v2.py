@@ -68,10 +68,11 @@ def intersection_points(p1, p2):
     return int(Dx/D), int(Dy/D) #TODO wystarczy int?
 
 
-def emiter(r, alfa):
-    x = r * np.cos(np.deg2rad(alfa))
-    y = r * np.sin(np.deg2rad(alfa))
-    return [x, y]
+def emiter(r, alfa, center):
+    # print("promien: {}".format(r))
+    x = center[0] + r * np.cos(np.deg2rad(alfa))
+    y = center[0] + r * np.sin(np.deg2rad(alfa))
+    return [int(x), int(y)]
 
 
 def detect_side(point, img_shape):#TODO trzeba poprawic zeby srodek byl w srodku okregu
@@ -85,69 +86,110 @@ def detect_side(point, img_shape):#TODO trzeba poprawic zeby srodek byl w srodku
         return [[img_shape[0] - 1, img_shape[1] - 1], [0, img_shape[1] - 1]]
 
 
-
-def detektory_na_okregu(r, alfa, l, n):
+# r - promień okręgu
+# alfa - kąt przesunięcia emittera
+# 1 - ???
+# n - liczba detektorów
+def detektory_na_okregu(r, alfa, l, n, center):
     detektory = []
     for i in range(0, n):
-        arg = alfa + np.pi - l/2 + i * (l/(n - 1))
-        arg = np.deg2rad(arg)
-        x = r * np.cos(arg)
-        y = r * np.sin(arg)
-        detektory.append([x, y])
+        arg = np.deg2rad(alfa) + np.pi - np.deg2rad(l)/2 + i * (np.deg2rad(l)/(n - 1))
+        # arg = np.deg2rad(arg)
+        x = center[0] + r * np.cos(arg)
+        y = center[1] + r * np.sin(arg)
+        detektory.append([int(x), int(y)])
     return detektory
 
-
-def detektory_na_prostokacie(detektory_na_okregu, center, img_shape):
-    for nr, i in enumerate(detektory_na_okregu):
-        point2 = detect_side(i, img_shape)
-        detektory_na_okregu[nr] = intersection_points([i, center], point2)
-    return detektory_na_okregu
-
-def emiter_na_prostokacie(p, center, img_shape):
-    #TODO jakos ogarnac zeby brac odpowiednia krawedz prostokata
-    point2 = detect_side(p, img_shape)
-    return intersection_points([p, center], point2)
-
-
-
-
 def make_sinogram(n, l, alfa, img, r, center):
+    test = np.zeros((img.shape[0]+2*r, img.shape[1]+2*r))
     ilosc = int(360 / alfa)
     sinogram = np.zeros((n, ilosc))
+    max_x = img.shape[0]
+    max_y = img.shape[1]
+    
+
     for i in range(0, ilosc):
-        print(str(i) + "------")
-        alfa = alfa * i
-        emiter_p = emiter(r, alfa)
-        print(emiter_p)
-        emiter_p = emiter_na_prostokacie(emiter_p, center, img.shape)
-        detektory = detektory_na_okregu(r, alfa, l, n)
-        print(detektory)
-        print("...........")
-        detektory = detektory_na_prostokacie(detektory, center, img.shape)
-        print(emiter_p)
-        print(detektory)
-        print("........")
+        # print(str(i) + "------")
+        alfa = i
+        # print("alfa: {}".format(alfa))
+        emiter_p = emiter(r, alfa, center)
+        # print("Emitter: {}".format(emiter_p))
+        # emiter_p = emiter_na_prostokacie(emiter_p, center, img.shape)
+        detektory = detektory_na_okregu(r, alfa, l, n, center)
+        # print("Detektory: {}".format(detektory))
+        # detektory = detektory_na_prostokacie(detektory, center, img.shape)
+        # print(emiter_p)
+        # print(detektory)
         for nr, e in enumerate(detektory):
             value = 0
             linia = prosta(emiter_p, e)
+            count = 0
             for q in linia:
-                value += img[q[0], q[1]]
-            sinogram[nr, i] = value
-    return sinogram
+                a = 0
+                b = 0
+                if q[0] < max_x and q[0] >=0 and q[1] < max_y and q[1] >=0:
+                    test[q[0], q[1]] = 1
+                    a = q[0]
+                    b = q[1]
+                    count += 1
+                    amount[a, b] += 1
+                    value += img[a, b]
+            # if count > 0:
+            #     value = value / count
+            sinogram[nr, i] += value
+    for i in range(img.shape[0]):
+        for j in range(img.shape[1]):
+            test[i+r, j+r] = 0.5
+    return sinogram/np.max(sinogram), test
 
+def transoform_to_img(sinogram, alfa, r, l, n, center):
+    ilosc = int(360 / alfa)
+    img = np.zeros((center[0]*2, center[1]*2))
+    max_x = img.shape[0]
+    max_y = img.shape[1]
+    for i in range(0, ilosc):
+        alfa = i
+        emiter_p = emiter(r, alfa, center)
+        detektors = detektory_na_okregu(r, alfa, l, n, center)
+        for nr, e in enumerate(detektors):
+            # print(len(detektors))
+            value = 0
+            linia = prosta(emiter_p, e)
+            # print("emiter: {}".format(emiter_p))
+            # print("detektor: {}".format(e))
+            # print("linia: {}".format(linia))
+            # print(img.shape)
+            for q in linia:
+                if q[0] < max_x and q[0] >=0 and q[1] < max_y and q[1] >=0:
+                    a = q[0]
+                    b = q[1]
+                    img[a, b] += sinogram[nr, alfa]
+    for i in range(img.shape[0]):
+        x = img.shape[0]-i-1
+        for j in range(img.shape[1]):
+            y = img.shape[1]-j-1
+            if amount[x, y] > 0:
+                img[x, y] = img[x, y] / amount[x, y]
+    return img
 
-n = 3 #ilosc detektorow
-l = 50 #kat rozlozenia detektorow
+n = 180 #ilosc detektorow
+l = 60 #kat rozlozenia detektorow
 alfa = 1 #kat przesunicia
-img = data.imread('CT_ScoutView.jpg')
+img = data.imread('ct-scan.jpg')
+img2 = img
 img = rgb2gray(img)
-
+amount = np.zeros(img.shape)
 print(img.shape)
-center = [img.shape[0]/2, img.shape[1]/2]
-r = np.sqrt(pow(img.shape[0], 2) + pow(img.shape[1], 2)) / 2
-print(r)
+center = [int(img.shape[0]/2), int(img.shape[1]/2)]
+r = int(np.sqrt(pow(center[0], 2) + pow(center[1], 2)))
+print("r: {}, center: {}".format(r, center))
 
-sinogram = make_sinogram(n, l, alfa, img, r, center)
-print(sinogram)
+sinogram, test = make_sinogram(n, l, alfa, img, r, center)
+# print(test)
+# io.imshow(asinogram / 255
+io.imshow(sinogram, cmap=plt.cm.gray)
+io.show()
 
-
+output = transoform_to_img(sinogram, alfa, r, l, n, center)
+io.imshow(output, cmap=plt.cm.gray)
+io.show()
