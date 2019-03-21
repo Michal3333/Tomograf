@@ -10,8 +10,8 @@ class SinogramGenerator:
     
     def generate(self, img):
         self.img = img
-        self.initiateData(img)
         ilosc = int(360 / self.alfa)
+        self.initiateData(img, ilosc)
         self.sinogram = np.zeros((self.n, ilosc))
 
         for i in range(ilosc):
@@ -27,20 +27,21 @@ class SinogramGenerator:
     def revert(self):
         ilosc = int(360 / self.alfa)
         self.reverted = np.zeros(self.img.shape)
-        
         for i in range(ilosc):
             alfa = self.alfa * i
             emitter = self.createEmitter(alfa)
             detectors = self.createDetectors(alfa)
             for nr, (x, y) in enumerate(detectors):
-                value = self.getSinogramValue(nr, i)                        
+                # value = self.getSinogramValue(nr, i)
+                value = self.sinogram[nr, i]                        
                 self.colorPixelsInPath(emitter, (x, y), value)
         for i in range(self.reverted.shape[0]):
             for j in range(self.reverted.shape[1]):
                 self.reverted[i, j] = self.reverted[i, j]/ self.amount[i, j]
         return self.reverted
 
-    def initiateData(self, img):
+    def initiateData(self, img, ilosc):
+        self.n = int(self.img.shape[0] * self.img.shape[1]/ilosc)
         self.x_max = img.shape[0]
         self.y_max = img.shape[1]
         self.amount = np.zeros(img.shape)
@@ -126,10 +127,12 @@ class SinogramGenerator:
         for i in range(int(x1), int(x2 + 1)):
             if obrot:
                 if y1 >= 0 and y1 < self.x_max and i >=0 and i < self.y_max:
+                    self.amount[y1, i] += 1
                     self.reverted[y1, i] += value
             else:
                 if y1 >= 0 and y1 < self.y_max and i >=0 and i < self.x_max:
                     self.reverted[i, y1] += value
+                    self.amount[i, y1] += 1
             e -= abs(dy)
             if e < 0:
                 y1 += krok
@@ -137,7 +140,6 @@ class SinogramGenerator:
 
     def getValue(self, x, y):
         if x >= 0 and x < self.x_max and y >=0 and y < self.y_max:
-            self.amount[x, y] += 1
             return self.img[x, y], 1
         else:
             return 0, 0
