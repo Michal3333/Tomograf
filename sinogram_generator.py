@@ -2,8 +2,9 @@ import numpy as np
 
 class SinogramGenerator:
     n = 201 # liczba detektorow
-    l = 360 # kat zasiegu detektorow
+    l = 180 # kat zasiegu detektorow
     alfa = 0.5 # kat o jaki przesuwac co krok
+    withFilter = False
 
     def __init__(self, img):
         self.img = img
@@ -12,19 +13,23 @@ class SinogramGenerator:
         self.img = img
         ilosc = int(360 / self.alfa)
         self.initiateData(img, ilosc)
-        self.sinogram = np.zeros((self.n, ilosc))
+        self.sinogram = np.zeros((ilosc, self.n))
 
         for i in range(ilosc):
             alfa = self.alfa * i
             emitter = self.createEmitter(alfa)
             detectors = self.createDetectors(alfa)
             for nr, (x, y) in enumerate(detectors):
-                self.sinogram[nr, i] = self.getRayValue(emitter, (x, y))
-        self.sinogram = self.sinogram
-        
+                self.sinogram[i, nr] = self.getRayValue(emitter, (x, y))
+            if self.withFilter == True:
+                self.sinogram[i] = self.filter(self.sinogram[i])
+        # if self.withFilter == True:
+        #     print("min: {}".format(np.min(self.sinogram)))
+        #     self.sinogram =self.sinogram + np.min(self.sinogram)
+        #     return self.sinogram / np.max(self.sinogram)
         return self.sinogram
 
-    def revert(self):
+    def revert(self):   
         ilosc = int(360 / self.alfa)
         self.reverted = np.zeros(self.img.shape)
         for i in range(ilosc):
@@ -33,7 +38,7 @@ class SinogramGenerator:
             detectors = self.createDetectors(alfa)
             for nr, (x, y) in enumerate(detectors):
                 # value = self.getSinogramValue(nr, i)
-                value = self.sinogram[nr, i]                        
+                value = self.sinogram[i, nr]                        
                 self.colorPixelsInPath(emitter, (x, y), value)
         for i in range(self.reverted.shape[0]):
             for j in range(self.reverted.shape[1]):
@@ -149,3 +154,33 @@ class SinogramGenerator:
             return self.sinogram[x, y]
         else:
             return 0
+
+    def filter(self, values):
+        self.kernel = [-1, 3, -1]
+        # self.generateKernel()
+        center = int(len(self.kernel)/ 2)
+        result = np.zeros(len(values))
+        # print("values: {}".format(values))
+        for i in range(len(values)):
+            sum = 0
+            count = 0
+            for j in range(len(self.kernel)):
+                x = i - center + j -1
+                if x >=0 and x < len(values):
+                    sum += values[x] * self.kernel[j]
+            if count > 0:
+                result[i] = sum / len(self.kernel)
+            else:
+                result[i] = sum / len(self.kernel)
+        return result
+
+    def generateKernel(self):
+        self.kernel = np.zeros(self.sinogram.shape[1])
+        center = int(len(self.kernel)/ 2)
+        for i in range(len(self.kernel)):
+            if i == center:
+                self.kernel[i] = 1
+            elif i%2 == 0:
+                self.kernel[i] = 0
+            else:
+                self.kernel[i] = -4/(np.pi*np.pi)/((i-center)*(i-center))
