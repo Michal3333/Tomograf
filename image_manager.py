@@ -17,5 +17,5 @@ class ImageManager:
     def showImage(self, img, save, name):
         io.imshow(img, cmap=plt.cm.gray)
         if save == True:
-            plt.savefig(name+str(datetime.now())+'.jpg')
+            plt.savefig(name+'.jpg')
         io.show()

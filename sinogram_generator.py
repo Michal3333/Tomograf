@@ -5,10 +5,15 @@ class SinogramGenerator:
     n = 360 # liczba detektorow
     l = 360 # kat zasiegu detektorow
     alfa = 1 # kat o jaki przesuwac co krok
+    sinogram_histor = []
+    revert_history = []
     withFilter = False
 
-    def __init__(self, img):
+    def __init__(self, img,n, l, alfa):
         self.img = img
+        self.n = n
+        self.l = l
+        self.alfa = alfa
     
     def generate(self, img):
         self.img = img
@@ -26,17 +31,22 @@ class SinogramGenerator:
                 self.sinogram[i, nr] = self.getRayValue(emitter, (x, y))
             if self.withFilter == True:
                 self.sinogram[i] = self.filter(self.sinogram[i])
+            if i % np.floor(ilosc / 20) == 0:
+                self.sinogram_histor.append(np.array(self.sinogram));
         if self.withFilter == True:
             min = np.min(self.sinogram)
             self.sinogram = self.sinogram - min
             max = np.max(self.sinogram)            
             self.sinogram = self.sinogram/max
+        self.sinogram_histor.append(np.array(self.sinogram));
         return self.sinogram
 
     def revert(self):   
         ilosc = int(360 / self.alfa)
         self.reverted = np.zeros(self.img.shape)
         self.amount = np.zeros(self.img.shape)
+        temp = np.array(self.reverted)
+        self.revert_history.append(temp)
         for i in range(ilosc):
             alfa = self.alfa * i
             emitter = self.createEmitter(alfa)
@@ -44,9 +54,19 @@ class SinogramGenerator:
             for nr, (x, y) in enumerate(detectors):
                 value = self.sinogram[i, nr]                        
                 self.colorPixelsInPath(emitter, (x, y), value)
+
+
+            if i % np.floor(ilosc / 20) == 0:
+                temp = np.array(self.reverted)
+                self.revert_history.append(temp)
+
+
+
         for i in range(self.reverted.shape[0]):
             for j in range(self.reverted.shape[1]):
                 self.reverted[i, j] = self.reverted[i, j]/ self.amount[i, j]
+        temp = np.array(self.reverted)
+        self.revert_history.append(temp)
         return self.reverted
 
     def initiateData(self, img, ilosc):
